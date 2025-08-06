@@ -249,3 +249,18 @@ WarnDisabledItem = "{Grey}Вы {Red}не можете {Grey}выбрать да�
 OptionListEmpty = "{Grey}В этом меню нет доступных опций"
 CancelledVote = "{darkred}{0} {Grey}отменил голосование."
 Console = "Консоль"
+
+[Lang.pt-PT]
+Prev = "Anterior"
+Next = "Proxímo"
+Exit = "Sair"
+Disabled = "Desativado"
+ScrollKey = "{0}/{1} - Scroll"
+SelectKey = "{0} - Selecionar"
+PrevKey = "{0} - Voltar"
+ExitKey = "{0} - Sair"
+SelectResolution = "Selecionar Resolução"
+WarnDisabledItem = "{Grey}Não podes {Red}introduzir esta opção."
+OptionListEmpty = "{Grey}Não há opções disponíveis neste menu."
+CancelledVote = "{darkred}{0} {Grey}cancelou a votação."
+Console = "Consola"
