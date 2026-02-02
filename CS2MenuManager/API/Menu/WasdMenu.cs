@@ -83,6 +83,9 @@ public class WasdMenuInstance : BaseMenuInstance
         };
 
         Player.SaveSpeed(ref OldVelocityModifier);
+        
+        // Restore previously saved menu state (if exists)
+        RestoreMenuState();
     }
 
     /// <summary>
@@ -150,6 +153,9 @@ public class WasdMenuInstance : BaseMenuInstance
     /// </summary>
     public override void Close(bool exitSound)
     {
+        // Save current menu state before closing
+        SaveMenuState();
+        
         base.Close(exitSound);
         Menu.Plugin.RemoveListener<OnTick>(OnTick);
 
@@ -212,6 +218,9 @@ public class WasdMenuInstance : BaseMenuInstance
         if (!string.IsNullOrEmpty(Config.Sound.Select))
             Player.ExecuteClientCommand($"play {Config.Sound.Select}");
 
+        // Save current menu state before selecting an option
+        SaveMenuState();
+        
         HandleSelectAction(option);
     }
 
@@ -253,5 +262,125 @@ public class WasdMenuInstance : BaseMenuInstance
 
         if (!string.IsNullOrEmpty(Config.Sound.ScrollUp))
             Player.ExecuteClientCommand($"play {Config.Sound.ScrollUp}");
+    }
+    
+    /// <summary>
+    /// Saves the current menu state (page number, offset, selected option, and page offset stack)
+    /// </summary>
+    private void SaveMenuState()
+    {
+        // Use a static dictionary to save menu states for each player
+        if (!MenuStateStorage.ContainsKey(Player.SteamID))
+        {
+            MenuStateStorage[Player.SteamID] = new Dictionary<string, MenuState>();
+        }
+        
+        // Use the menu title as the key to save the state of this menu
+        MenuStateStorage[Player.SteamID][Menu.Title] = new MenuState
+        {
+            Page = Page,
+            CurrentOffset = CurrentOffset,
+            CurrentChoiceIndex = CurrentChoiceIndex,
+            PrevPageOffsets = new Stack<int>(PrevPageOffsets) // Create a copy of the stack
+        };
+    }
+    
+    /// <summary>
+    /// Restores the previously saved menu state (page number, offset, selected option, and page offset stack)
+    /// </summary>
+    private void RestoreMenuState()
+    {
+        if (MenuStateStorage.ContainsKey(Player.SteamID) && 
+            MenuStateStorage[Player.SteamID].ContainsKey(Menu.Title))
+        {
+            MenuState state = MenuStateStorage[Player.SteamID][Menu.Title];
+            Page = state.Page;
+            CurrentOffset = state.CurrentOffset;
+            CurrentChoiceIndex = state.CurrentChoiceIndex;
+            
+            // Restore the page offset stack
+            PrevPageOffsets.Clear();
+            foreach (int offset in state.PrevPageOffsets)
+            {
+                PrevPageOffsets.Push(offset);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Menu state class, used to save the page number, offset, selected option, and page offset stack of a menu
+    /// </summary>
+    private class MenuState
+    {
+        public int Page { get; set; }
+        public int CurrentOffset { get; set; }
+        public int CurrentChoiceIndex { get; set; }
+        public Stack<int> PrevPageOffsets { get; set; } = new Stack<int>();
+    }
+    
+    /// <summary>
+    /// Static dictionary used to store menu states for all players
+    /// </summary>
+    private static readonly Dictionary<ulong, Dictionary<string, MenuState>> MenuStateStorage = new();
+    
+    /// <summary>
+    /// Cleans up the menu state for a specific player
+    /// </summary>
+    /// <param name="steamId">The player's SteamID</param>
+    public static void CleanupPlayerState(ulong steamId)
+    {
+        if (MenuStateStorage.ContainsKey(steamId))
+        {
+            MenuStateStorage.Remove(steamId);
+        }
+    }
+    
+    /// <summary>
+    /// Cleans up all menu states
+    /// </summary>
+    public static void CleanupAllStates()
+    {
+        MenuStateStorage.Clear();
+    }
+}
+
+/// <summary>
+/// WasdMenu state manager, used to handle state cleanup when players disconnect or when the map changes
+/// </summary>
+public static class WasdMenuStateManager
+{
+    /// <summary>
+    /// Registers WasdMenu state manager events
+    /// </summary>
+    /// <param name="plugin">The plugin instance</param>
+    public static void RegisterEvents(BasePlugin plugin)
+    {
+        // Register player disconnect event
+        plugin.RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
+        
+        // Register round end event
+        plugin.RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
+    }
+    
+    /// <summary>
+    /// Handles player disconnect event
+    /// </summary>
+    private static HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
+    {
+        if (@event.Userid != null)
+        {
+            WasdMenuInstance.CleanupPlayerState(@event.Userid.SteamID);
+        }
+        return HookResult.Continue;
+    }
+    
+    /// <summary>
+    /// Handles round end event
+    /// </summary>
+    private static HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
+    {
+        // Clean up all menu states at the end of each round
+        WasdMenuInstance.CleanupAllStates();
+        return HookResult.Continue;
     }
 }
